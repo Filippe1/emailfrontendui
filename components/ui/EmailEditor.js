@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { debounce } from 'lodash'; // or implement your own debounce
 
-export default function EmailEditor() {
-  const [mjml, setMjml] = useState(`
+export default function EmailEditor({ initialMjml = '' }) {
+  const [mjml, setMjml] = useState(initialMjml || `
     <mjml>
       <mj-body>
         <mj-section>
@@ -14,31 +15,69 @@ export default function EmailEditor() {
   `);
   const [html, setHtml] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('preview'); // 'preview' or 'code'
+  const [activeTab, setActiveTab] = useState('preview');
+  const [error, setError] = useState(null);
 
-  const handleConvert = async () => {
+  // Debounced conversion function
+  const convertMjml = useCallback(debounce(async (mjmlCode) => {
+    if (!mjmlCode.trim()) {
+      setHtml('');
+      return;
+    }
+
     setIsLoading(true);
+    setError(null);
+    
     try {
       const response = await fetch('/api/mjml', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mjml }),
+        body: JSON.stringify({ mjml: mjmlCode }),
       });
 
+      if (!response.ok) {
+        throw new Error('Conversion failed');
+      }
+
       const data = await response.json();
-      setHtml(data.html || data.error);
-    } catch (error) {
-      setHtml(`Error: ${error.message}`);
+      setHtml(data.html);
+    } catch (err) {
+      console.error('Conversion error:', err);
+      setError(err.message);
+      setHtml('');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, 500), []); // 500ms debounce delay
 
-  // Create iframe content with proper email styling
+  // Automatically convert when MJML changes
+  useEffect(() => {
+    convertMjml(mjml);
+    return () => convertMjml.cancel(); // Cleanup on unmount
+  }, [mjml, convertMjml]);
+
+  // Handle initial prop changes
+  useEffect(() => {
+    if (initialMjml) {
+      setMjml(initialMjml);
+    }
+  }, [initialMjml]);
+
   const getIframeContent = () => {
-    return `
+    return `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 0; background: #f5f5f5; }
+            .email-container { max-width: 600px; margin: 0 auto; background: white; }
+          </style>
+        </head>
+        <body>
+          <div class="email-container">
             ${html}
-         `;
+          </div>
+        </body>
+      </html>`;
   };
 
   return (
@@ -56,79 +95,79 @@ export default function EmailEditor() {
             minHeight: '400px'
           }}
         />
-        <button 
-          onClick={handleConvert} 
-          disabled={isLoading}
-          style={{
-            marginTop: '10px',
-            padding: '8px 16px',
-            background: '#0070f3',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          {isLoading ? 'Converting...' : 'Convert to HTML'}
-        </button>
+        <div style={{ marginTop: '10px', minHeight: '24px' }}>
+          {isLoading && <span>Converting...</span>}
+          {error && <span style={{ color: 'red' }}>Error: {error}</span>}
+        </div>
       </div>
 
       <div style={{ flex: 1 }}>
         <h2>Preview</h2>
-        {html ? (
-          <>
-            <div style={{ marginBottom: '10px' }}>
-              <button 
-                onClick={() => setActiveTab('preview')}
-                style={{
-                  padding: '8px 16px',
-                  background: activeTab === 'preview' ? '#0070f3' : '#eaeaea',
-                  color: activeTab === 'preview' ? 'white' : 'black',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                Preview
-              </button>
-              <button 
-                onClick={() => setActiveTab('code')}
-                style={{
-                  padding: '8px 16px',
-                  background: activeTab === 'code' ? '#0070f3' : '#eaeaea',
-                  color: activeTab === 'code' ? 'white' : 'black',
-                  border: 'none',
-                  cursor: 'pointer',
-                  marginLeft: '5px'
-                }}
-              >
-                HTML Code
-              </button>
-            </div>
+        <div style={{ marginBottom: '10px' }}>
+          <button 
+            onClick={() => setActiveTab('preview')}
+            style={{
+              padding: '8px 16px',
+              background: activeTab === 'preview' ? '#0070f3' : '#eaeaea',
+              color: activeTab === 'preview' ? 'white' : 'black',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            Preview
+          </button>
+          <button 
+            onClick={() => setActiveTab('code')}
+            style={{
+              padding: '8px 16px',
+              background: activeTab === 'code' ? '#0070f3' : '#eaeaea',
+              color: activeTab === 'code' ? 'white' : 'black',
+              border: 'none',
+              cursor: 'pointer',
+              marginLeft: '5px'
+            }}
+          >
+            HTML Code
+          </button>
+        </div>
 
-            {activeTab === 'preview' ? (
-              <iframe
-                srcDoc={getIframeContent()}
-                title="Email Preview"
-                style={{
-                  width: '100%',
-                  height: '500px',
-                  border: '1px solid #ddd',
-                  background: 'white'
-                }}
-                sandbox="allow-same-origin" // Required for srcDoc to work
-              />
-            ) : (
-              <pre style={{
-                background: '#f5f5f5',
-                padding: '10px',
-                overflow: 'auto',
+        {isLoading ? (
+          <div style={{
+            background: '#f5f5f5',
+            padding: '20px',
+            textAlign: 'center',
+            border: '1px dashed #ccc',
+            height: '500px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            Converting MJML...
+          </div>
+        ) : html ? (
+          activeTab === 'preview' ? (
+            <iframe
+              srcDoc={getIframeContent()}
+              title="Email Preview"
+              style={{
+                width: '100%',
                 height: '500px',
-                border: '1px solid #ddd'
-              }}>
-                {html}
-              </pre>
-            )}
-          </>
+                border: '1px solid #ddd',
+                background: 'white'
+              }}
+              sandbox="allow-same-origin"
+            />
+          ) : (
+            <pre style={{
+              background: '#f5f5f5',
+              padding: '10px',
+              overflow: 'auto',
+              height: '500px',
+              border: '1px solid #ddd'
+            }}>
+              {html}
+            </pre>
+          )
         ) : (
           <div style={{
             background: '#f5f5f5',
@@ -140,7 +179,7 @@ export default function EmailEditor() {
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            {isLoading ? 'Generating preview...' : 'Convert MJML to see preview'}
+            {error ? 'Error in MJML' : 'Enter MJML to see preview'}
           </div>
         )}
       </div>

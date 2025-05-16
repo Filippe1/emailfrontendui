@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import EmailEditor from '../components/ui/EmailEditor';
 
 export default function Home() {
   const [prompt, setPrompt] = useState('');
@@ -7,6 +8,7 @@ export default function Home() {
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [mjmlInput, setMjmlInput] = useState(''); // New state for MJML input
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -44,6 +46,8 @@ export default function Home() {
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response text found';
       setResponse(text);
+      // Automatically set the MJML editor with the response
+      setMjmlInput(text);
     } catch (err) {
       console.error('Error:', err);
       setError(err.message);
@@ -129,8 +133,13 @@ export default function Home() {
             <div className="prose prose-sm max-w-none">
               <p className="whitespace-pre-line">{response}</p>
             </div>
+            
           </div>
         )}
+        <div>
+              <h1>MJML Converter</h1>
+              <EmailEditor initialMjml={mjmlInput}/>
+            </div>
       </div>
     </div>
   );
