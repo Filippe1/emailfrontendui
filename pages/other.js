@@ -66,7 +66,7 @@ export default function Home() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Gemini AI with PDF</h1>
           <p className="mt-2 text-sm text-gray-600">
-            Ask questions or provide a PDF for the Gemini 2.0 Flash model
+            Ask any question or provide a PDF for the Gemini 2.0 Flash model
           </p>
         </div>
 
