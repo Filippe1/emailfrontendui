@@ -127,15 +127,6 @@ export default function Home() {
           )}
         </div>
 
-        {response && (
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Response</h2>
-            <div className="prose prose-sm max-w-none">
-              <p className="whitespace-pre-line">{response}</p>
-            </div>
-            
-          </div>
-        )}
         <div>
               <h1>MJML Converter</h1>
               <EmailEditor initialMjml={mjmlInput}/>
